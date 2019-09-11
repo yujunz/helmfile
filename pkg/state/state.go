@@ -45,6 +45,7 @@ type HelmState struct {
 	DeprecatedReleases []ReleaseSpec     `yaml:"charts,omitempty"`
 	Namespace          string            `yaml:"namespace,omitempty"`
 	Repositories       []RepositorySpec  `yaml:"repositories,omitempty"`
+	Archives           []ArchiveSpec     `yaml:"archives,omitempty"`
 	Releases           []ReleaseSpec     `yaml:"releases,omitempty"`
 	Selectors          []string          `yaml:"-"`
 
@@ -105,6 +106,12 @@ type HelmSpec struct {
 	TLSCACert string `yaml:"tlsCACert,omitempty"`
 	TLSKey    string `yaml:"tlsKey,omitempty"`
 	TLSCert   string `yaml:"tlsCert,omitempty"`
+}
+
+// ArchiveSpec defines values for a helm archive, e.g. s3 bucket without index
+type ArchiveSpec struct {
+	Name string `yaml:"name,omitempty"`
+	URL  string `yaml:"url,omitempty"`
 }
 
 // RepositorySpec that defines values for a helm repo
@@ -481,6 +488,22 @@ func (st *HelmState) getDeployedVersion(context helmexec.HelmContext, helm helme
 	}
 }
 
+// chartToURL convert archive name to URL
+func (st *HelmState) chartToURL(chart string) string {
+	sep := "/"
+	slices := strings.Split(chart, sep)
+	if len(slices) >= 1 {
+		for _, ar := range st.Archives {
+			if slices[0] == ar.Name {
+				slices[0] = ar.URL
+				st.logger.Debugf("Archive %s => %s", ar.Name, ar.URL)
+				return strings.Join(slices, sep)
+			}
+		}
+	}
+	return chart
+}
+
 // downloadCharts will download and untar charts for Lint and Template
 func (st *HelmState) downloadCharts(helm helmexec.Interface, dir string, concurrency int, helmfileCommand string) (map[string]string, []error) {
 	temp := make(map[string]string, len(st.Releases))
@@ -523,7 +546,8 @@ func (st *HelmState) downloadCharts(helm helmexec.Interface, dir string, concurr
 					// only fetch chart if it is not already fetched
 					if _, err := os.Stat(chartPath); os.IsNotExist(err) {
 						fetchFlags = append(fetchFlags, "--untar", "--untardir", chartPath)
-						if err := helm.Fetch(release.Chart, fetchFlags...); err != nil {
+						chartURL := st.chartToURL(release.Chart)
+						if err := helm.Fetch(chartURL, fetchFlags...); err != nil {
 							errs = append(errs, err)
 						}
 					}

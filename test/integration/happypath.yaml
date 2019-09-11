@@ -3,6 +3,10 @@ environments:
     values:
       - environment.values.yaml
 ---
+archives:
+  - name: kir4h
+    url: https://kir4h.github.io/charts
+
 repositories:
   - name: stable
     url: https://kubernetes-charts.storage.googleapis.com/
@@ -25,3 +29,6 @@ releases:
     values:
       - mysecret: {{ .Environment.Values.mysecret }}
       - values.yaml
+
+  - name: registry-creds
+    chart: kir4h/registry-creds/registry-creds-0.1.0.tgz
